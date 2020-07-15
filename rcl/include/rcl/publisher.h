@@ -482,6 +482,22 @@ RCL_WARN_UNUSED
 const rcl_publisher_options_t *
 rcl_publisher_get_options(const rcl_publisher_t * publisher);
 
+
+/// Get the qos options of rosout.
+/**
+  * \param[out] publisher pointer point to the rcl publisher options
+  * \param[in] qos options of rosout
+  * \return `RCL_RET_OK` if the `publisher_options` argument is valid, or
+  * \return `RCL_RET_PUBLISHER_INVALID` if it is `NULL` pointer.
+  */
+RCL_PUBLIC
+RCL_WARN_UNUSED
+rcl_ret_t 
+rcl_get_rosout_qos_options(
+  rcl_publisher_options_t *publisher_options,
+  const rmw_qos_profile_t rosout_qos);
+
+
 /// Return the rmw publisher handle.
 /**
  * The handle returned is a pointer to the internally held rmw handle.

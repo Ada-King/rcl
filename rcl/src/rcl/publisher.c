@@ -367,6 +367,21 @@ rcl_publisher_get_options(const rcl_publisher_t * publisher)
   return _publisher_get_options(publisher);
 }
 
+rcl_ret_t 
+rcl_get_rosout_qos_options(
+  rcl_publisher_options_t *publisher_options,
+  const rmw_qos_profile_t rosout_qos)
+{
+  RCL_CHECK_ARGUMENT_FOR_NULL(publisher_options, RCL_RET_INVALID_ARGUMENT);
+
+  publisher_options->qos.depth = rosout_qos.depth;
+  publisher_options->qos.durability = rosout_qos.durability;
+  publisher_options->qos.lifespan.sec = rosout_qos.lifespan.sec;
+  publisher_options->qos.lifespan.nsec = rosout_qos.lifespan.nsec;
+
+  return RCL_RET_OK;
+}
+
 rmw_publisher_t *
 rcl_publisher_get_rmw_handle(const rcl_publisher_t * publisher)
 {

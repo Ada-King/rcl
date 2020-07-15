@@ -56,6 +56,7 @@ rcl_node_options_copy(
   options_out->allocator = options->allocator;
   options_out->use_global_arguments = options->use_global_arguments;
   options_out->enable_rosout = options->enable_rosout;
+  options_out->rosout_qos = options->rosout_qos;
   if (NULL != options->arguments.impl) {
     rcl_ret_t ret = rcl_arguments_copy(&(options->arguments), &(options_out->arguments));
     return ret;
