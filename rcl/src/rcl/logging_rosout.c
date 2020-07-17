@@ -174,7 +174,7 @@ rcl_ret_t rcl_logging_rosout_init_publisher_for_node(
     rosidl_typesupport_c__get_message_type_support_handle__rcl_interfaces__msg__Log();
   rcl_publisher_options_t options = rcl_publisher_get_default_options();
 
-  // Late joining subscriptions get the last 10 seconds of logs, up to 1000 logs.
+  // Late joining subscriptions get the user's setting of rosout qos options.
   status = rcl_get_rosout_qos_options(&options, node->impl->options.rosout_qos);
   if(RCL_RET_OK == status){
 	  new_entry.publisher = rcl_get_zero_initialized_publisher();

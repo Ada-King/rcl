@@ -29,9 +29,20 @@ extern "C"
 #include "rcl/node_options.h"
 #include "rcl/types.h"
 #include "rcl/visibility_control.h"
+#include "rcl/guard_condition.h"
 
 struct rcl_guard_condition_t;
 struct rcl_node_impl_t;
+
+typedef struct rcl_node_impl_t
+{
+  rcl_node_options_t options;
+  size_t actual_domain_id;
+  rmw_node_t * rmw_node_handle;
+  rcl_guard_condition_t * graph_guard_condition;
+  const char * logger_name;
+  const char * fq_name;
+} rcl_node_impl_t;
 
 /// Structure which encapsulates a ROS Node.
 typedef struct rcl_node_t
