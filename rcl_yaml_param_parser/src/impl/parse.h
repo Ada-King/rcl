@@ -41,7 +41,10 @@ RCUTILS_WARN_UNUSED
 rcutils_ret_t parse_value(
   const yaml_event_t event,
   const bool is_seq,
+  const bool is_anchor,
   const size_t node_idx,
+  const size_t anchor_idx,
+  const size_t anchor_parameter_idx,
   const size_t parameter_idx,
   data_types_t * seq_data_type,
   rcl_params_t * params_st);
@@ -52,7 +55,10 @@ rcutils_ret_t parse_key(
   const yaml_event_t event,
   uint32_t * map_level,
   bool * is_new_map,
+  bool * is_anchor,
   size_t * node_idx,
+  size_t * anchor_idx,
+  size_t * anchor_parameter_idx,
   size_t * parameter_idx,
   namespace_tracker_t * ns_tracker,
   rcl_params_t * params_st);

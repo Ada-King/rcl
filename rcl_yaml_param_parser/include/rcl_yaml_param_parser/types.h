@@ -94,6 +94,13 @@ typedef struct rcl_node_params_s
   size_t num_params;  ///< Number of parameters in the node
 } rcl_node_params_t;
 
+typedef struct rcl_anchor_config_s
+{
+  char ** anchor_names;
+  rcl_node_params_t * params;
+  size_t num_anchors;
+}rcl_anchor_config_t;
+
 /// stores all the parameters of all nodes of a process
 /*
 * \typedef rcl_params_t
@@ -101,6 +108,7 @@ typedef struct rcl_node_params_s
 typedef struct rcl_params_s
 {
   char ** node_names;  ///< List of names of the node
+  rcl_anchor_config_t * anchor_config; ///< Anchor configuration.
   rcl_node_params_t * params;  ///<  Array of parameters
   size_t num_nodes;       ///< Number of nodes
   rcutils_allocator_t allocator;  ///< Allocator used

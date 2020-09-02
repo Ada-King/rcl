@@ -22,6 +22,60 @@
 #include "./impl/namespace.h"
 #include "./impl/node_params.h"
 
+// Add the key of anchor's params to params_st
+void add_param_key_to_anchor(
+  const char *value,
+  size_t anchor_idx,
+  size_t anchor_parameter_idx,
+  rcl_params_t * params_st)
+{
+  return;
+}
+
+// Add the anchor's name to params_st
+void add_anchor_name_to_param(
+  const char * anchor_value,
+  size_t * anchor_idx,
+  rcl_params_t * params_st)
+{
+  return;
+}
+
+// Get anchor index through alias.
+void get_anchor_idx_by_alias(
+  const char * alias_value,
+  size_t anchor_idx,
+  rcl_params_t * params_st)
+{
+  return;
+}
+
+// Save previously config to corresponding node.
+void  add_anchor_config_to_node(
+  rcl_node_params_t * anchor_params,
+  size_t node_idx,
+  rcl_params_t * params_st)
+{
+  return;
+}
+
+void save_anchor_config_to_node(
+  const char * alias_value,
+  size_t node_idx,
+  rcl_params_t * params_st)
+{
+  ......
+  rcl_node_params_t * anchor_params;
+  size_t anchor_idx;
+  // get anchor index through alias, alias name needs to be matched to a previously defined, 
+  // anchor of the same name, ensure its existence and uniqueness.
+  get_anchor_idx_by_alias(alias_value, &anchor_idx, params_st);
+  anchor_params = &(params_st->anchor_config->params[anchor_idx]);
+  // save previously config to corresponding node.
+  add_anchor_config_to_node(anchor_params, node_idx, params_st);
+  ......
+}
+
 ///
 /// Determine the type of the value and return the converted value
 /// NOTE: Only canonical forms supported as of now
@@ -145,7 +199,10 @@ void * get_value(
 rcutils_ret_t parse_value(
   const yaml_event_t event,
   const bool is_seq,
+  const bool is_anchor,
   const size_t node_idx,
+  const size_t anchor_idx,
+  const size_t anchor_parameter_idx,
   const size_t parameter_idx,
   data_types_t * seq_data_type,
   rcl_params_t * params_st)
@@ -157,9 +214,11 @@ rcutils_ret_t parse_value(
   RCUTILS_CHECK_ALLOCATOR_WITH_MSG(
     &allocator, "invalid allocator", return RCUTILS_RET_INVALID_ARGUMENT);
 
-  if (0U == params_st->num_nodes) {
-    RCUTILS_SET_ERROR_MSG("No node to update");
-    return RCUTILS_RET_INVALID_ARGUMENT;
+  if(false == is_anchor) {
+    if (0U == params_st->num_nodes) {
+      RCUTILS_SET_ERROR_MSG("No node to update");
+      return RCUTILS_RET_INVALID_ARGUMENT;
+    }
   }
 
   const size_t val_size = event.data.scalar.length;
@@ -178,12 +237,19 @@ rcutils_ret_t parse_value(
     return RCUTILS_RET_ERROR;
   }
 
-  if (NULL == params_st->params[node_idx].parameter_values) {
-    RCUTILS_SET_ERROR_MSG("Internal error: Invalid mem");
-    return RCUTILS_RET_BAD_ALLOC;
+  if(false == is_anchor) {
+    if (NULL == params_st->params[node_idx].parameter_values) {
+      RCUTILS_SET_ERROR_MSG("Internal error: Invalid mem");
+      return RCUTILS_RET_BAD_ALLOC;
+    }
   }
 
-  rcl_variant_t * param_value = &(params_st->params[node_idx].parameter_values[parameter_idx]);
+  rcl_variant_t * param_value = NULL;
+  if(is_anchor) {
+    param_value = &(params_st->anchor_config->params[anchor_idx].parameter_values[anchor_parameter_idx]);
+  } else {
+    param_value = &(params_st->params[node_idx].parameter_values[parameter_idx]);
+  }
 
   data_types_t val_type;
   void * ret_val = get_value(value, style, &val_type, allocator);
@@ -384,7 +450,10 @@ rcutils_ret_t parse_key(
   const yaml_event_t event,
   uint32_t * map_level,
   bool * is_new_map,
+  bool * is_anchor,
   size_t * node_idx,
+  size_t * anchor_idx,
+  size_t * anchor_parameter_idx,
   size_t * parameter_idx,
   namespace_tracker_t * ns_tracker,
   rcl_params_t * params_st)
@@ -418,6 +487,13 @@ rcutils_ret_t parse_key(
       {
         /// Till we get PARAMS_KEY, keep adding to node namespace
         if (0 != strncmp(PARAMS_KEY, value, strlen(PARAMS_KEY))) {
+          // If it's an ANCHOR_KEY, then return.
+          if (0 == strncmp(ANCHOR_KEY, value, strlen(ANCHOR_KEY))) {
+            *is_anchor = true;
+            (*map_level)++;
+            break;
+          }
+          *is_anchor = false;
           ret = add_name_to_ns(ns_tracker, value, NS_TYPE_NODE, allocator);
           if (RCUTILS_RET_OK != ret) {
             RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
@@ -463,6 +539,11 @@ rcutils_ret_t parse_key(
 
         /// If it is a new map, the previous key is param namespace
         if (*is_new_map) {
+          // Determine whether the param key is contained in `config_anchor`
+          if(true == *is_anchor) {
+            add_param_key_to_anchor(value, *anchor_idx, *anchor_parameter_idx, params_st);
+            break;
+          }
           parameter_ns = params_st->params[*node_idx].parameter_names[*parameter_idx];
           if (NULL == parameter_ns) {
             RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
@@ -546,6 +627,7 @@ rcutils_ret_t parse_file_events(
 {
   int32_t done_parsing = 0;
   bool is_key = true;
+  bool is_anchor = false;
   bool is_seq = false;
   uint32_t line_num = 0;
   data_types_t seq_data_type = DATA_TYPE_UNKNOWN;
@@ -561,6 +643,8 @@ rcutils_ret_t parse_file_events(
 
   yaml_event_t event;
   size_t node_idx = 0;
+  size_t anchor_idx = 0;
+  size_t anchor_parameter_idx = 0;
   size_t parameter_idx = 0;
   rcutils_ret_t ret = RCUTILS_RET_OK;
   while (0 == done_parsing) {
@@ -585,7 +669,8 @@ rcutils_ret_t parse_file_events(
           /// Need to toggle between key and value at params level
           if (is_key) {
             ret = parse_key(
-              event, &map_level, &is_new_map, &node_idx, &parameter_idx, ns_tracker, params_st);
+              event, &map_level, &is_new_map, &is_anchor, &node_idx, &anchor_idx, 
+              &anchor_parameter_idx, &parameter_idx, ns_tracker, params_st);
             if (RCUTILS_RET_OK != ret) {
               break;
             }
@@ -598,19 +683,21 @@ rcutils_ret_t parse_file_events(
               ret = RCUTILS_RET_ERROR;
               break;
             }
-            if (0U == params_st->num_nodes) {
-              RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
-                "Cannot have a value before %s at line %d", PARAMS_KEY, line_num);
-              yaml_event_delete(&event);
-              return RCUTILS_RET_ERROR;
+            if(false == is_anchor) {
+              if (0U == params_st->num_nodes) {
+                RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
+                  "Cannot have a value before %s at line %d", PARAMS_KEY, line_num);
+                yaml_event_delete(&event);
+                return RCUTILS_RET_ERROR;
+              }
+              if (0U == params_st->params[node_idx].num_params) {
+                RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
+                  "Cannot have a value before %s at line %d", PARAMS_KEY, line_num);
+                yaml_event_delete(&event);
+                return RCUTILS_RET_ERROR;
+              }
             }
-            if (0U == params_st->params[node_idx].num_params) {
-              RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
-                "Cannot have a value before %s at line %d", PARAMS_KEY, line_num);
-              yaml_event_delete(&event);
-              return RCUTILS_RET_ERROR;
-            }
-            ret = parse_value(event, is_seq, node_idx, parameter_idx, &seq_data_type, params_st);
+            ret = parse_value(event, is_seq, is_anchor, node_idx, anchor_idx, anchor_parameter_idx, parameter_idx, &seq_data_type, params_st);
             if (RCUTILS_RET_OK != ret) {
               break;
             }
@@ -644,6 +731,11 @@ rcutils_ret_t parse_file_events(
         map_depth++;
         is_new_map = true;
         is_key = true;
+        const char * anchor_value = (char *)event.data.scalar.anchor;
+        if(anchor_value) {
+          add_anchor_name_to_param(anchor_value, &anchor_idx, params_st);
+          break;
+        }
         /// Disable new map if it is PARAMS_KEY map
         if ((MAP_PARAMS_LVL == map_level) &&
           ((map_depth - (ns_tracker->num_node_ns + 1U)) == 2U))
@@ -680,9 +772,13 @@ rcutils_ret_t parse_file_events(
         map_depth--;
         break;
       case YAML_ALIAS_EVENT:
-        RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
-          "Will not support aliasing at line %d\n", line_num);
-        ret = RCUTILS_RET_ERROR;
+        {
+          const char * alias_value = (char *)event.data.alias.anchor;
+          save_anchor_config_to_node(alias_value, node_idx, params_st);
+      	}
+        // RCUTILS_SET_ERROR_MSG_WITH_FORMAT_STRING(
+        //  "Will not support aliasing at line %d\n", line_num);
+        // ret = RCUTILS_RET_ERROR;
         break;
       case YAML_STREAM_START_EVENT:
         break;
@@ -732,7 +828,7 @@ rcutils_ret_t parse_value_events(
         break;
       case YAML_SCALAR_EVENT:
         ret = parse_value(
-          event, is_seq, node_idx, parameter_idx, &seq_data_type, params_st);
+          event, is_seq, false, node_idx, 0, 0, parameter_idx, &seq_data_type, params_st);
         break;
       case YAML_SEQUENCE_START_EVENT:
         is_seq = true;

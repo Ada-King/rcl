@@ -28,6 +28,7 @@ extern "C"
 #endif
 
 #define PARAMS_KEY "ros__parameters"
+#define ANCHOR_KEY "anchor_config"
 #define NODE_NS_SEPERATOR "/"
 #define PARAMETER_NS_SEPERATOR "."
 

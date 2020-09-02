@@ -37,6 +37,8 @@
 
 #define MAX_NUM_NODE_ENTRIES 256U
 
+#define MAX_NUM_ANCHOR 256U
+
 ///
 /// Create the rcl_params_t parameter structure
 ///
@@ -55,6 +57,30 @@ rcl_params_t * rcl_yaml_node_struct_init(
   params_st->node_names = allocator.zero_allocate(
     MAX_NUM_NODE_ENTRIES, sizeof(char *), allocator.state);
   if (NULL == params_st->node_names) {
+    rcl_yaml_node_struct_fini(params_st);
+    RCUTILS_SAFE_FWRITE_TO_STDERR("Error allocating mem\n");
+    return NULL;
+  }
+
+  params_st->anchor_config = allocator.zero_allocate(1, sizeof(rcl_anchor_config_t), allocator.state);
+  if (NULL == params_st->anchor_config) {
+    rcl_yaml_node_struct_fini(params_st);
+    RCUTILS_SAFE_FWRITE_TO_STDERR("Error allocating mem\n");
+    return NULL;
+  }
+
+  rcl_anchor_config_t * anchor_config = params_st->anchor_config;
+  anchor_config->anchor_names = allocator.zero_allocate(
+  	MAX_NUM_ANCHOR, sizeof(char *), allocator.state);
+  if (NULL == anchor_config->anchor_names) {
+    rcl_yaml_node_struct_fini(params_st);
+    RCUTILS_SAFE_FWRITE_TO_STDERR("Error allocating mem\n");
+    return NULL;
+  }
+
+  anchor_config->params = allocator.zero_allocate(
+  	MAX_NUM_ANCHOR, sizeof(rcl_node_params_t), allocator.state);
+  if (NULL == anchor_config->params) {
     rcl_yaml_node_struct_fini(params_st);
     RCUTILS_SAFE_FWRITE_TO_STDERR("Error allocating mem\n");
     return NULL;
@@ -153,6 +179,9 @@ void rcl_yaml_node_struct_fini(
     allocator.deallocate(params_st->node_names, allocator.state);
     params_st->node_names = NULL;
   }
+
+  // Deallocate memory allocated in `rcl_yaml_node_struct_init` before.
+  // deallocate_anchor_config_mem(params_st->anchor_config);
 
   if (NULL != params_st->params) {
     for (size_t node_idx = 0U; node_idx < params_st->num_nodes; node_idx++) {
